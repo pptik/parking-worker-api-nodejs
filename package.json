@@ -10,16 +10,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "amqplib": "^0.5.3",
+    "amqplib": "^0.8.0",
     "date-fns": "^2.27.0",
     "dotenv": "^8.0.0",
     "express": "^4.17.1",
     "fs-extra": "^8.1.0",
     "moment": "^2.24.0",
-    "mongodb": "^3.2.4",
-    "mongoose": "^5.9.2",
     "mqtt": "^4.2.8",
-    "node-sqlite3": "github:a-was/node-sqlite3",
     "sqlite3": "^5.0.2"
   }
 }

@@ -1,10 +1,13 @@
-
-const SQLite3 = require('node-sqlite3') 
+const SQLite3 = require('sqlite3').verbose();
 const dbFile = __dirname + '/Parkir.db'
-const db = new SQLite3(dbFile)
+
+let db = new SQLite3.Database(dbFile, SQLite3.OPEN_READWRITE, (err) => {
+  if(err) throw err;
+  console.log("Koneksi ke database berhasil!");
+})
 
 const createConnection = async () => {
-  await db.open()
+  await db.serialize()
 };
 
 const database = async () => {

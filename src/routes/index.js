@@ -10,14 +10,18 @@ router.get(
 )
 router.get(
   "/getLogsLimit",
-  logController.getLogs 
+  logController.getLogsLimit
 )
 
 router.get(
   "/getLogs",
-  logController.getLogs 
+  logController.getLogs
 )
 
+router.post(
+  "/addUsersRFID",
+  usersController.addUsers
+)
 
 
 module.exports = router

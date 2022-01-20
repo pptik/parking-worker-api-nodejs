@@ -2,68 +2,108 @@ const format = require("date-fns/format");
 const mqtt_connect = require("../consumer")
 const { requestResponse } = require("../utils");
 const { db } = require("../databases/sqlite")
+const id = require('date-fns/locale/id');
+const logger = require('../utils/logger')
 
 let response
 
-const main = async (guid, kode_rfid) => {
-  const timestamp = ~~(new Date() / 1000);
-  const users = await db.all("SELECT * FROM rfid_activity WHERE kode_rfid = ?", [kode_rfid])
-  const logs = await db.all("SELECT * FROM logsiot WHERE rfid = ? AND time_out IS NULL", [kode_rfid])
-  const activity = await db.all("SELECT * FROM activityiot WHERE input_guid = ?", [guid])
-  
-  if (users.length > 0){
-    response = "Data Tersedia"
-  } else {
-    response = "Users Tidak Ditemukan"
-  }
+const GateOpen = async (guid, kode_rfid) => {
+  try{
+  const timestamp = format(new Date(), 'dd LLLL yyyy HH:mm:ss', { locale: id })
+  const kondisi = "Belum Keluar"
+  db.serialize(() => {
+    db.all("SELECT * FROM rfid_activity WHERE kode_rfid = ?", [kode_rfid], (err, users) => {
+      if (err) throw err;
+      
+      if (users.length > 0) {
+        db.all("SELECT * FROM activityiot WHERE input_guid = ?", [guid], (err, activity) => {
+          if (err) throw err;
+          
+          if (activity.length > 0) {
+            const message_publish = ""+activity[0].output_guid+"#"+activity[0].output_value+""
+            const fallback_message = ""+users[0].kode_rfid+"#"+users[0].nama+"#"+timestamp+"#gate-open"
+            db.run("INSERT INTO logsiot (nama, kode_rfid, jam_masuk, jam_keluar) VALUES (?, ?, ?, ?)", [users[0].nama, users[0].kode_rfid, timestamp, kondisi], async (err, activity) => {
+              if (err) throw err;
+              await mqtt_connect.publish('Gate-Open', message_publish)
+              await mqtt_connect.publish('gate-fallback', fallback_message)  
+            })
+            
+          } else {
+            logger.error("Activity Not Found")
+          }  
+        })  
+      } else {
+        logger.error("Users Not Found")
+      }
+    }) 
+  })
+  } catch (error) {
+  logger.error(error);
+  response = { ...requestResponse.server_error };
+}
+}
 
-  if (activity.length > 0) {
-    response = "Data Tersedia"
-  } else {
-    response = "Activity Tidak Ditemukan"
-  }
-
-  if (logs.length > 0) {
-    const fallback_message = ""+users[0].kode_rfid+"#"+users[0].nama+"#"+timestamp+"#gate-close"
-    const message_publish = ""+activity[0].output_guid+"#"+activity[0].output_value+""
-    await db.run("UPDATE logsiot SET time_out = '"+timestamp+"', output_value = '1' WHERE rfid = '"+kode_rfid+"' AND time_out IS NULL")
-    await mqtt_connect.publish('gate-close', message_publish)
-    await mqtt_connect.publish('gate-fallback', fallback_message)
-  } else {
-    const fallback_message = ""+users[0].kode_rfid+"#"+users[0].nama+"#"+timestamp+"#gate-open"
-    const message_publish = ""+activity[0].output_guid+"#"+activity[0].output_value+""
-    await db.run("INSERT INTO logsiot (input_guid, output_guid,rfid, output_value, username, user_guid, time_in, time_out) VALUES ('"+guid+"', '"+activity[0].output_guid+"','"+users[0].kode_rfid+"' , '"+activity[0].output_value+"', '"+users[0].nama+"', '"+users[0].id+"', '"+timestamp+"', null )")
-    await mqtt_connect.publish('gate-open', message_publish)
-    await mqtt_connect.publish('gate-fallback', fallback_message)
+const GateClose = async (guid, kode_rfid) => {
+  try{
+    const timestamp = format(new Date(), 'dd LLLL yyyy HH:mm:ss', { locale: id })
+    const kondisi = "Belum Keluar"
+    db.all("SELECT * FROM rfid_activity WHERE kode_rfid = ?", [kode_rfid], (err, users) => {
+      if (err) throw err;
+      
+      if (users.length > 0) {
+        db.all("SELECT * FROM activityiot WHERE input_guid = ?", [guid], (err, activity) => {
+          if (err) throw err;
+          if (activity.length > 0) {
+            const message_publish = ""+activity[0].output_guid+"#"+activity[0].output_value+""
+            const fallback_message = ""+users[0].kode_rfid+"#"+users[0].nama+"#"+timestamp+"#gate-close"
+            db.run("UPDATE logsiot SET jam_keluar = '"+timestamp+"' WHERE kode_rfid = '"+kode_rfid+"' AND jam_keluar = '"+kondisi+"'", async () => {
+              await mqtt_connect.publish('Gate-Close', message_publish)
+              await mqtt_connect.publish('gate-fallback', fallback_message)
+            })
+            
+          }
+        })
+      } else {
+        logger.error("Users Not Found")
+      }
+    })
+    // const keluar = await db.all("SELECT * FROM logsiot WHERE jam_keluar = ?", [kondisi])
+    
+  } catch (error) {
+    logger.error(error);
   }
 }
 
-
 const getLogsLimit = async (req, res) => {
   try {
-    const logs = await db.all("SELECT * FROM logsiot LIMIT 3 ORDER BY time_in DESC")
-    response = { ...requestResponse.success, data: logs }
+    db.all("SELECT * FROM logsiot ORDER BY jam_masuk DESC", [] ,(err, logs) => {
+      if (err) throw err;
+      response = { ...requestResponse.success, data: logs }
+      res.status(response.code).json(response);
+    })
   } catch (error) {
     logger.error(error);
     response = { ...requestResponse.server_error };
+    res.status(response.code).json(response);
   }
-  res.status(response.code).json(response);
 }
 
 
 const getLogs = async (req, res) => {
   try {
-    const logs = await db.all("SELECT * FROM logsiot ORDER BY time_in DESC")
-    response = { ...requestResponse.success, data: logs }
+    db.all("SELECT * FROM logsiot ORDER BY jam_masuk DESC", function (err, logs) {
+      response = { ...requestResponse.success, data: logs }
+      res.status(response.code).json(response);
+    })
   } catch (error) {
     logger.error(error);
-    response = { ...requestResponse.server_error };
+    
   }
-  res.status(response.code).json(response);
 }
 
 module.exports = {
-  main,
+  GateOpen,
+  GateClose,
   getLogs,
   getLogsLimit
 }

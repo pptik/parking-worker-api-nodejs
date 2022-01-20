@@ -4,13 +4,16 @@ const express = require("express");
 const routes = require("./routes");
 const sqlite3 = require("../src/databases/sqlite")
 const { requestResponse } = require("./utils");
+const { cors } = require("./configuration/cors")
 
 require("dotenv").config();
 
 const app = express();
+app.use(cors)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(routes);
+
 
 app.use((req, res) => {
   const response = requestResponse.not_found;
