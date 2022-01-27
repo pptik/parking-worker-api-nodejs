@@ -1,4 +1,4 @@
-const format = require("date-fns/format");
+const { format } = require("date-fns");
 const mqtt_connect = require("../consumer")
 const { requestResponse } = require("../utils");
 const { db } = require("../databases/sqlite")
@@ -54,13 +54,14 @@ const GateClose = async (guid, kode_rfid) => {
         db.all("SELECT * FROM activityiot WHERE input_guid = ?", [guid], (err, activity) => {
           if (err) throw err;
           if (activity.length > 0) {
-            const message_publish = ""+activity[0].output_guid+"#"+activity[0].output_value+""
-            const fallback_message = ""+users[0].kode_rfid+"#"+users[0].nama+"#"+timestamp+"#gate-close"
-            db.run("UPDATE logsiot SET jam_keluar = '"+timestamp+"' WHERE kode_rfid = '"+kode_rfid+"' AND jam_keluar = '"+kondisi+"'", async () => {
-              await mqtt_connect.publish('Gate-Close', message_publish)
-              await mqtt_connect.publish('gate-fallback', fallback_message)
-            })
-            
+            db.all("SELECT * FROM logsiot WHERE kode_rfid = ? && jam_keluar = 'Belum Keluar'", [kode_rfid], (err, logsiot) => {
+              const message_publish = ""+activity[0].output_guid+"#"+activity[0].output_value+""
+              const fallback_message = ""+users[0].kode_rfid+"#"+users[0].nama+"#"+timestamp+"#gate-close"
+              db.run("UPDATE logsiot SET jam_keluar = '"+timestamp+"' WHERE kode_rfid = '"+kode_rfid+"' AND jam_keluar = '"+kondisi+"'", async () => {
+                await mqtt_connect.publish('Gate-Close', message_publish)
+                await mqtt_connect.publish('gate-fallback', fallback_message)
+              })
+            }) 
           }
         })
       } else {
@@ -101,9 +102,45 @@ const getLogs = async (req, res) => {
   }
 }
 
+const manualGateOpen = async (req, res) => {
+  try {
+    const { guid } = req.body
+    db.all("SELECT * FROM activityiot WHERE input_guid = ?", [guid], async (err, activity) => {
+      if (err) throw err;
+      if (activity.length > 0) {
+        const message_publish = ""+activity[0].output_guid+"#"+activity[0].output_value+""
+        await mqtt_connect.publish('Gate-Open', message_publish)
+        response = { ...requestResponse.success, data: message_publish }
+        res.status(response.code).json(response);
+      }
+    })
+  } catch (error) {
+    logger.error(error); 
+  }
+}
+
+const manualGateClose = async (req, res) => {
+  try {
+    const { guid } = req.body
+    db.all("SELECT * FROM activityiot WHERE input_guid = ?", [guid], async (err, activity) => {
+      if (err) throw err;
+      if (activity.length > 0) {
+        const message_publish = ""+activity[0].output_guid+"#"+activity[0].output_value+""
+        await mqtt_connect.publish('Gate-Close', message_publish)
+        response = { ...requestResponse.success, data: message_publish }
+        res.status(response.code).json(response);
+      }
+    })
+  } catch (error) {
+    logger.error(error); 
+  }
+}
+
 module.exports = {
   GateOpen,
   GateClose,
   getLogs,
-  getLogsLimit
+  getLogsLimit,
+  manualGateClose,
+  manualGateOpen
 }

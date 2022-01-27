@@ -26,7 +26,7 @@ exports.consume = async () => {
   })
 
   rmq.on('message', (topic, payload) => {
-    logger.info(topic, payload.toString())
+    // logger.info(topic, payload.toString())
     const data = payload.toString().split("#")
 
     if (topic === 'VD-Open'){

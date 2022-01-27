@@ -23,5 +23,14 @@ router.post(
   usersController.addUsers
 )
 
+router.post(
+  "/gateOpen",
+  logController.manualGateOpen
+)
+
+router.post(
+  "/gateClose",
+  logController.manualGateClose
+)
 
 module.exports = router
