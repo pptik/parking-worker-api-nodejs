@@ -21,7 +21,7 @@ const getUsers = async (req, res) => {
 const addUsers = async (req, res) => {
   try {
     const { name, kode_rfid } = req.body
-    const timestamp = format(new Date(), 'dd LLLL yyyy HH:mm:ss', { locale: id })
+    const timestamp = format(new Date(), 'YYY-MM-dd', { locale: id })
     db.run("INSERT INTO rfid_activity (nama, kode_rfid, tanggal_daftar) VALUES ('"+name+"', '"+kode_rfid+"', '"+timestamp+"' )", [] ,(err, users) => {
 
       response = { ...requestResponse.success, data: users }
